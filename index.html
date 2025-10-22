@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YOLOv11 - Menu Dataset</title>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+  <style>
+    body {
+      background-color: #0d1117;
+      color: #e6edf3;
+      font-family: "Segoe UI", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      margin: 0;
+    }
+    h2 { margin-bottom: 15px; color: #58a6ff; text-align: center; font-size: 1.1rem; }
+    .menu { display: flex; gap: 10px; margin-bottom: 20px; }
+    .menu button {
+      padding: 10px 20px;
+      background-color: #238636;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .menu button:hover { background-color: #2ea043; }
+    .menu button.active { background-color: #1f6feb; }
+
+    .main-container {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+      max-width: 1000px;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      background-color: #161b22;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
+      flex: 1 1 600px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    canvas {
+      border: 3px solid #58a6ff;
+      border-radius: 10px;
+      width: 100%;
+      height: auto;
+      max-width: 800px;
+    }
+    button.detect {
+      background-color: #238636;
+      border: none;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: 0.2s;
+      width: 100%;
+      max-width: 320px;
+    }
+    button.detect:hover { background-color: #2ea043; }
+    input[type="file"] {
+      width: 100%;
+      max-width: 320px;
+      color: #e6edf3;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 8px;
+    }
+    #resultBox {
+      background-color: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 10px;
+      width: 100%;
+      text-align: left;
+      box-sizing: border-box;
+    }
+    .label-item {
+      margin-bottom: 8px;
+      padding: 8px;
+      border-left: 4px solid #00ff99;
+      background: #161b22;
+      border-radius: 6px;
+    }
+    .label-name { color: #00ff99; font-weight: bold; }
+    .desc { color: #ccc; font-size: 14px; }
+
+    .info-panel {
+      background-color: #161b22;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
+      padding: 20px;
+      width: 300px;
+      flex: 1 1 280px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-sizing: border-box;
+    }
+    .info-panel h3 {
+      color: #58a6ff;
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 1rem;
+    }
+    .info-item {
+      background-color: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 15px;
+    }
+    .info-item span { color: #00ff99; }
+
+    .product-desc {
+      background-color: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 10px;
+      min-height: 80px;
+      color: #ccc;
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+    .product-desc-label {
+      color: #58a6ff;
+      font-weight: bold;
+      margin-bottom: 5px;
+      display: block;
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 768px) {
+      .main-container { flex-direction: column; align-items: center; }
+      .info-panel, .container { width: 100%; max-width: 95vw; }
+      canvas { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <h2>🌿 STEM và sức khỏe học đường được khơi nguồn từ tách chiết các hợp chất tự nhiên – sáng tạo vì một thế hệ xanh (11A16)</h2>
+  <div class="menu">
+    <button id="btnRan" class="active">🪨 Rắn</button>
+    <button id="btnLong">💧 Lỏng</button>
+  </div>
+
+  <div class="main-container">
+    <div class="container">
+      <input type="file" id="imageInput" accept="image/*" />
+      <button id="detectBtn" class="detect">🚀 Tiến hành nhận diện</button>
+      <canvas id="canvas"></canvas>
+      <div id="resultBox">🔍 Chưa có kết quả nhận diện.</div>
+    </div>
+
+    <div class="info-panel">
+      <h3>📊 Thông tin mô hình</h3>
+      <div class="info-item">Dataset hiện tại: <span id="datasetName">Rắn</span></div>
+      <div class="info-item">Số vật thể phát hiện: <span id="objectCount">0</span></div>
+      <div class="info-item">Độ tin cậy cao nhất: <span id="confidence">--%</span></div>
+      <div class="info-item">Nhãn vật thể chính: <span id="objectLabel">--</span></div>
+      <div class="info-item">Thời gian xử lý: <span id="processTime">-- ms</span></div>
+
+      <div>
+        <span class="product-desc-label">📖 Mô tả sản phẩm:</span>
+        <div class="product-desc" id="productDesc">👉 Hãy nhập ảnh của bạn để tiến hành nhận diện.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const detectBtn = document.getElementById("detectBtn");
+    const imageInput = document.getElementById("imageInput");
+    const resultBox = document.getElementById("resultBox");
+    const confidenceEl = document.getElementById("confidence");
+    const objectCountEl = document.getElementById("objectCount");
+    const objectLabelEl = document.getElementById("objectLabel");
+    const processTimeEl = document.getElementById("processTime");
+    const datasetName = document.getElementById("datasetName");
+    const btnLong = document.getElementById("btnLong");
+    const btnRan = document.getElementById("btnRan");
+    const productDesc = document.getElementById("productDesc");
+
+    let img = new Image();
+    let session;
+    let labels = [];
+
+    let currentModel = "merged_model_ran.onnx";
+    let currentClasses = "classes_ran.txt";
+
+    // ✅ Mô tả mặc định theo Dataset
+    const defaultDescRan =
+      "🧪 Dịch chiết từ gừng có màu vàng nhạt đến vàng đậm, mùi thơm đặc trưng. " +
+      "Chứa nhiều hoạt chất sinh học như gingerol và shogaol, giúp chống viêm, kháng khuẩn và tăng cường miễn dịch. " +
+      "Thường được ứng dụng trong thực phẩm chức năng, mỹ phẩm thiên nhiên và y học cổ truyền."
+      + "Nếu đây là thông tin có nghĩa rằng chúng mình chưa cập nhật, cảm ơn các bạn đã sử dụng hệ thống";
+
+    const defaultDescLong =
+      "💧 Đây là mô tả của các sản phẩm dạng lỏng. Bạn có thể ghi công dụng, cách dùng hoặc đặc điểm nhận dạng.";
+
+    const descDefaultGuide = "👉 Hãy nhập ảnh của bạn để tiến hành nhận diện.";
+
+    // ✅ Mô tả riêng theo nhãn
+// ✅ Mô tả riêng theo nhãn
+const labelDescriptions = {
+  "gung": 
+    "🌿 Gừng tươi có mùi thơm cay nồng đặc trưng, chứa nhiều hoạt chất gingerol và shogaol giúp tăng cường miễn dịch, hỗ trợ tiêu hóa và kháng viêm.",
+
+  "nuoc gung":
+    "🧪 Dịch chiết gừng là dung dịch có màu vàng nhạt đến vàng đậm, có mùi thơm cay nồng đặc trưng của gừng. " +
+    "Đây là chế phẩm thu được từ củ gừng tươi thông qua quá trình chiết bằng dung môi như ethanol, methanol hoặc nước. " +
+    "Thành phần chính của dịch chiết gừng gồm gingerol, shogaol và zingerone — những hợp chất có tác dụng sinh học mạnh.\n\n" +
+
+    "🌿 1. Đặc điểm cảm quan:\n" +
+    "- Màu sắc: vàng nhạt → vàng đậm.\n" +
+    "- Mùi: thơm cay nồng đặc trưng.\n" +
+    "- Trạng thái: dạng lỏng, có thể hơi đục nhẹ.\n" +
+    "- pH: hơi axit (5.5–6.5).\n\n" +
+
+    "🧪 2. Thành phần hoạt chất:\n" +
+    "- Gingerol: hoạt chất chính, chống oxy hóa mạnh.\n" +
+    "- Shogaol: hình thành khi đun nóng, tăng hiệu lực sinh học.\n" +
+    "- Zingerone: tạo mùi thơm dịu, có tác dụng kháng khuẩn.\n\n" +
+
+    "💊 3. Công dụng:\n" +
+    "- Kháng viêm, kháng khuẩn, chống oxy hóa mạnh.\n" +
+    "- Hỗ trợ tiêu hóa, giảm đầy hơi, buồn nôn.\n" +
+    "- Tăng tuần hoàn máu, giảm đau tự nhiên.\n" +
+    "- Hỗ trợ điều hòa miễn dịch.\n\n" +
+
+    "🏭 4. Ứng dụng:\n" +
+    "- Trong thực phẩm: làm hương liệu tự nhiên, bảo quản thực phẩm.\n" +
+    "- Trong mỹ phẩm: tạo mùi thơm, tác dụng thư giãn, làm ấm.\n" +
+    "- Trong y học cổ truyền và dược phẩm: điều trị cảm lạnh, ho, viêm khớp.\n\n" +
+
+    "⚗️ 5. Phương pháp chiết:\n" +
+    "- Chiết dung môi (ethanol, nước,…)\n" +
+    "- Chiết siêu âm, chiết vi sóng để tăng hiệu suất.\n" +
+    "- Kiểm soát nhiệt độ và thời gian để tối ưu hoạt chất.\n\n" +
+
+    "🧊 6. Bảo quản:\n" +
+    "- Nhiệt độ thấp (4–8 °C), tránh ánh sáng.\n" +
+    "- Có thể thêm chất chống oxy hóa tự nhiên (vitamin E, acid citric).\n\n" +
+
+    "⚠️ 7. Lưu ý:\n" +
+    "- Có thể gây kích ứng nhẹ với da nhạy cảm.\n" +
+    "- Kiểm tra độ tinh khiết và nồng độ trước khi sử dụng.\n" +
+    "- Phương pháp chiết ảnh hưởng trực tiếp đến hiệu suất và chất lượng.\n\n" +
+
+    "✅ 8. Kết luận:\n" +
+    "Dịch chiết gừng là nguyên liệu tự nhiên quý giá, chứa nhiều hoạt chất sinh học, có ứng dụng rộng rãi trong thực phẩm, mỹ phẩm và y học cổ truyền. " +
+    "Đây là một trong những chế phẩm từ thực vật có tiềm năng cao trong nghiên cứu và ứng dụng công nghiệp xanh.",
+
+  "Blue solution": "🌊 Dung dịch có màu xanh lam đặc trưng...",
+  "Brick red ppt": "🧱 Kết tủa màu đỏ gạch...",
+  "cam": "🍊 Quả cam tươi, giàu vitamin C...",
+  "CCLA": "🧪 Dung dịch thử nghiệm Clorua canxi...",
+  "CCMA": "🧪 Dung dịch phản ứng trung gian...",
+  "chanh": "🍋 Trái chanh tươi, vị chua tự nhiên...",
+  "Chlorine Dioxide Kit": "🧪 Bộ dung dịch thử ClO2 dùng trong xử lý nước...",
+  "dau": "🌿 Dầu thiên nhiên, màu vàng nhạt, không tan trong nước...",
+  "dich chiet cam": "🍊 Dịch chiết cam chứa flavonoid, tinh dầu...",
+  "dich chiet dau": "🌿 Dịch chiết dầu giàu acid béo và chất chống oxy hóa...",
+  "dich chiet dua": "🥥 Dịch chiết dừa chứa acid lauric, vitamin E...",
+  "dich chiet kiwi": "🥝 Dịch chiết kiwi giàu vitamin C và chất chống oxy hóa...",
+  "dua": "🥥 Quả dừa tươi, nước dừa ngọt nhẹ...",
+  "Fructose": "🍬 Đường trái cây Fructose, tinh thể trắng, vị ngọt thanh...",
+  "Glucose": "🍭 Đường Glucose, tinh thể trắng, vị ngọt nhẹ...",
+  "green ppt": "💚 Kết tủa xanh lục trong các phản ứng ion kim loại...",
+  "kiwi": "🥝 Quả kiwi tươi, vị chua ngọt, giàu vitamin C...",
+  "nuoc": "💧 Nước tinh khiết, dung môi phổ biến...",
+  "objects": "📦 Mẫu vật hoặc dụng cụ trong thí nghiệm...",
+  "Orange red ppt": "🧡 Kết tủa cam đỏ, thường trong phản ứng kim loại...",
+  "sea": "🌊 Mẫu nước biển hoặc dung dịch muối khoáng...",
+  "starch": "🌾 Tinh bột, dung dịch đục, phản ứng xanh tím với iod...",
+  "sua": "🥛 Sữa, màu trắng đục, giàu dinh dưỡng...",
+  "Sucrose": "🍬 Đường mía, tinh thể trắng, ngọt đậm...",
+  "yellow": "🟡 Dung dịch vàng, có thể là phản ứng hữu cơ hoặc kim loại..."
+};
+
+
+    productDesc.textContent = descDefaultGuide;
+
+    function loadModel() {
+      labels = [];
+      ort.InferenceSession.create(currentModel, { executionProviders: ["wasm"] })
+        .then(s => { session = s; console.log("✅ Mô hình đã sẵn sàng:", currentModel); })
+        .catch(err => console.error("❌ Lỗi tải mô hình:", err));
+
+      fetch(currentClasses)
+        .then(res => res.text())
+        .then(txt => { labels = txt.split("\n").map(x => x.trim()).filter(x => x); })
+        .catch(() => alert("Không tìm thấy file nhãn!"));
+    }
+
+    loadModel();
+
+    btnLong.onclick = () => {
+      currentModel = "merged_model_long.onnx";
+      currentClasses = "classes_long.txt";
+      datasetName.textContent = "Lỏng";
+      btnLong.classList.add("active");
+      btnRan.classList.remove("active");
+      loadModel();
+      resetUI();
+      productDesc.textContent = descDefaultGuide;
+    };
+
+    btnRan.onclick = () => {
+      currentModel = "merged_model_ran.onnx";
+      currentClasses = "classes_ran.txt";
+      datasetName.textContent = "Rắn";
+      btnRan.classList.add("active");
+      btnLong.classList.remove("active");
+      loadModel();
+      resetUI();
+      productDesc.textContent = descDefaultGuide;
+    };
+
+    function resetUI(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      resultBox.innerHTML = "🔍 Chưa có kết quả nhận diện.";
+      objectCountEl.textContent = 0;
+      confidenceEl.textContent = "--%";
+      objectLabelEl.textContent = "--";
+      processTimeEl.textContent = "-- ms";
+      productDesc.textContent = descDefaultGuide;
+    }
+
+    imageInput.addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        img.onload = () => {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    detectBtn.addEventListener("click", async () => {
+      if (!session) return alert("⚠️ Mô hình chưa sẵn sàng!");
+      if (!img.src) return alert("⚠️ Chưa chọn ảnh!");
+
+      const start = performance.now();
+      const { inputTensor, ratio, pad } = preprocess(img);
+      const output = await session.run({ [session.inputNames[0]]: inputTensor });
+      const data = output[session.outputNames[0]].data;
+      const boxes = postprocess(data, ratio, pad, img.width, img.height);
+      const time = (performance.now() - start).toFixed(1);
+
+      // Không cần vẽ bounding box
+      ctx.drawImage(img, 0, 0, img.width, img.height);
+      updateInfo(boxes, time);
+    });
+
+    function preprocess(image) {
+      const size = 640;
+      const tmp = document.createElement("canvas");
+      const ctx2 = tmp.getContext("2d");
+      tmp.width = tmp.height = size;
+      const scale = Math.min(size / image.width, size / image.height);
+      const newW = image.width * scale, newH = image.height * scale;
+      const dx = (size - newW) / 2, dy = (size - newH) / 2;
+      ctx2.fillStyle = "black"; ctx2.fillRect(0, 0, size, size);
+      ctx2.drawImage(image, dx, dy, newW, newH);
+      const imgData = ctx2.getImageData(0, 0, size, size).data;
+      const float32 = new Float32Array(3 * size * size);
+      for (let i = 0; i < size * size; i++) {
+        float32[i] = imgData[i * 4] / 255;
+        float32[i + size * size] = imgData[i * 4 + 1] / 255;
+        float32[i + 2 * size * size] = imgData[i * 4 + 2] / 255;
+      }
+      return { inputTensor: new ort.Tensor("float32", float32, [1, 3, size, size]), ratio: scale, pad: [dx, dy] };
+    }
+
+    function postprocess(data, ratio, pad, w, h) {
+      const boxes = [];
+      for (let i = 0; i < data.length; i += 6) {
+        const [x1, y1, x2, y2, score, cls] = data.slice(i, i + 6);
+        if (score < 0.4) continue;
+        boxes.push({ score, cls });
+      }
+      return boxes.sort((a, b) => b.score - a.score);
+    }
+
+    function updateInfo(boxes, time) {
+      objectCountEl.textContent = boxes.length;
+      processTimeEl.textContent = `${time} ms`;
+
+      if (!boxes.length) {
+        resultBox.innerHTML = "😕 Không phát hiện vật thể nào.";
+        productDesc.textContent = descDefaultGuide;
+        return;
+      }
+
+const best = boxes[0];
+const labelIndex = Math.round(best.cls);
+const label = labels[labelIndex] || "Không xác định";
+
+confidenceEl.textContent = (best.score * 100).toFixed(1) + "%";
+objectLabelEl.textContent = label;
+
+// ✅ Chỉ chạy toLowerCase khi label hợp lệ
+if (label && label !== "Không xác định" && labelDescriptions[label.toLowerCase()]) {
+  productDesc.textContent = labelDescriptions[label.toLowerCase()];
+} else {
+  productDesc.textContent = (datasetName.textContent === "Rắn") ? defaultDescRan : defaultDescLong;
+}
+
+// ✅ Hiển thị danh sách nhãn duy nhất
+const uniqueLabels = {};
+boxes.forEach(b => {
+  const li = Math.round(b.cls);
+  const l = labels[li] || "Không xác định";
+  if (!uniqueLabels[l] || b.score > uniqueLabels[l]) {
+    uniqueLabels[l] = b.score;
+  }
+});
+
+resultBox.innerHTML = Object.entries(uniqueLabels).map(([label, score]) => `
+  <div class='label-item'>
+    <div class='label-name'>${label}</div>
+    <div class='desc'>Độ tin cậy: ${(score * 100).toFixed(1)}%</div>
+  </div>
+`).join("");
+
+    }
+  </script>
+</body>
+</html>
